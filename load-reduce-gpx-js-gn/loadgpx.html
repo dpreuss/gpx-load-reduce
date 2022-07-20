@@ -1,0 +1,135 @@
+<html>
+<body>
+<!-- Written by Don Preuss -->
+<!-- Convert GPX to Linestring -->
+
+<!-- Output in this form:  "LINESTRING (-80.00289 7.655562, -80.001078 7.663475,  -79.943665 8.482773, -79.943427 8.48258)"; -->
+
+<!-- Use simplify.js to clean up track -->
+<!--  Shorten long tracks that move slowly by reducing points using the Ramer-Douglas-Peucker Algorithm -->
+
+<script src="C:/Users/ninap/Desktop/PP/GPXParser.js"></script>
+<script src ="C:/Users/ninap/Desktop/PP/simplify.js"></script>
+</script>
+
+
+<input type="file" id="upload">
+
+
+<script>
+// Test input of gpx and output of gpx
+ function getCoordinates(str, trackName, date, author) {
+  const arr = str.split(', '); //rows of pairs
+  const finalArr = [];
+  const header = '<?xml version="1.0" encoding="utf-8"?>\n<gpx version="1.1" creator="GoodNautical" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www8.garmin.com/xmlschemas/GpxExtensionsv3.xsd" xmlns:opencpn="http://www.opencpn.org">\n';
+
+  const footer = "</trkseg></trk></gpx></xml>";
+  var xml;
+  var parser, xmlDoc;
+
+  const metadata = '<metadata><author>'+author+'</author><time>'+date+'</time></metadata>\n<trk>\n<name>'+trackName+'</name><trkseg>';
+  
+  xml = header + metadata;
+
+  for (var i = 0, n = arr.length; i < n; i++) {
+    latlon = arr[i].trim().split(' ')
+    xml = xml + `<trkpt lat=\"` + parseFloat(latlon[1]) + `" lon="` + parseFloat(latlon[0]) + `"></trkpt>\n`;
+  }
+  xml = xml + footer;
+  parser = new DOMParser();
+  xmlDoc = parser.parseFromString(xml, "text/xml");
+  return xml;
+}
+
+
+const uploadReadFile = document.getElementById('upload');
+
+uploadReadFile.addEventListener('change', readFileAsString)
+
+
+
+function readFileAsString() {
+    var files = this.files;
+    var countOfSkipped = 0;
+    const Lat2Meter = 111139; // Meters around the earth
+  //  const XTRACK = 111139 * 0.000009 // Around 1M 
+    const XTRACK = 1 / 111139 * 10; // Size of world in meters, 10M 
+    const points = [];
+    var pointsArr;
+    var name;
+
+    if (files.length === 0) {
+        console.log('No file is selected');
+        return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(event) {
+
+        var gpx = new gpxParser(); //Create gpxParser Object
+        gpx.parse(reader.result); //parse gpx file from string data
+
+
+// Data could be in a track or in a route, support both
+
+	if(gpx.tracks.length > 0) {
+           pointsArr= gpx.tracks[0].points;
+	   name = gpx.tracks[0].name;
+	}
+	else if (gpx.routes.length > 0) { // See if it is a route instead of a track
+           pointsArr= gpx.routes[0].points;
+	   name = gpx.routes[0].name;
+	}
+	else
+	{
+		alert("No tracks or routes")
+		//exit 
+	}
+
+
+	let fileName = document.getElementById("upload").value;
+
+	let shortTrack = simplify(pointsArr, XTRACK ); // 10 Meters
+	for (let i = 0; i < shortTrack.length; i++) {
+		points.push(shortTrack[i].lon + ' '+ shortTrack[i].lat);
+	}
+	
+        linestring = 'LINESTRING (' + points.join(", ") +  ');'
+//        console.log(linestring);
+//        console.log('Original / Processed: ' + shortTrack.length +'/'+pointsArr.length+' '+'File: '+fileName)
+
+
+// TEST Code
+let trackName = name;
+let date = "2021-12-10T110000";
+let author = "Don Preuss"
+
+var xmltext = getCoordinates(/.+\((.+)\)/.exec(linestring)[1], trackName ,date, author);
+
+
+var filename = trackName+'.gpx';
+var pom = document.createElement('a');
+var bb = new Blob([xmltext], {type: 'text/plain'});
+
+pom.setAttribute('href', window.URL.createObjectURL(bb));
+pom.setAttribute('download', filename);
+
+pom.dataset.downloadurl = ['text/plain', pom.download, pom.href].join(':');
+pom.draggable = true; 
+pom.classList.add('dragout');
+
+pom.click();
+
+// END TEST
+
+
+
+    };
+
+    reader.readAsText(files[0]);
+
+}
+
+
+</script>
+</body></html>

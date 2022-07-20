@@ -1,0 +1,121 @@
+<html>
+<body>
+<!-- Written by Don Preuss -->
+
+<!-- Use simplify.js to clean up track -->
+<!--  Shorten long tracks that move slowly by reducing points using the Ramer-Douglas-Peucker Algorithm -->
+<!-- July, 2022 - Adapted to input gpx and output gpx, added time back in, added waypoints support. 
+
+<script src="./GPXParser.js"></script>
+<script src ="./simplify.js"></script>
+</script>
+
+
+<input type="file" id="upload">
+
+
+<script>
+// Test input of gpx and output of gpx
+ function getCoordinates(arr, trackName, date, author) {
+  const finalArr = [];
+  const header = '<?xml version="1.0" encoding="utf-8"?>\n<gpx version="1.1" creator="NoForeignland" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www8.garmin.com/xmlschemas/GpxExtensionsv3.xsd" xmlns:opencpn="http://www.opencpn.org">\n';
+
+  const footer = "</trkseg></trk></gpx></xml>";
+  var xml;
+  var parser, xmlDoc;
+
+  const metadata = '<metadata><author>'+author+'</author><time>'+date.toISOString()+'</time></metadata>\n<trk>\n<name>'+trackName+'</name><trkseg>';
+  
+  xml = header + metadata;
+
+  for (var i = 0, n = arr.length; i < n; i++) {
+    xml = xml + `<trkpt lat=\"` + parseFloat(arr[i].lat) + `" lon="` + parseFloat(arr[i].lon) + `" time= "` + arr[i].time.toISOString() + `"></trkpt>\n`;
+  }
+  xml = xml + footer;
+  parser = new DOMParser();
+  xmlDoc = parser.parseFromString(xml, "text/xml");
+  return xml;
+}
+
+
+const uploadReadFile = document.getElementById('upload');
+
+uploadReadFile.addEventListener('change', readFileAsString)
+
+
+
+function readFileAsString() {
+    var files = this.files;
+    var countOfSkipped = 0;
+    const Lat2Meter = 111139; // Meters around the earth
+    const XTRACK = 1 / 111139 * 10; // Size of world in meters, 10M 
+    const points = [];
+    var pointsArr = [];
+    var name;
+
+    if (files.length === 0) {
+        console.log('No file is selected');
+        return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(event) {
+// Read Gpx file in and parse
+        var gpx = new gpxParser(); //Create gpxParser Object
+        gpx.parse(reader.result); //parse gpx file from string data
+
+// TODO Need to get date from track (last date/time) and add it in. 
+
+        let date = "2021-12-10T110000";
+
+// Data could be in a track or in a route, support both
+
+	if(gpx.tracks.length > 0) {
+           pointsArr= gpx.tracks[0].points;
+	   name = gpx.tracks[0].name;
+	}
+	else if (gpx.routes.length > 0) { // See if it is a route instead of a track
+           pointsArr= gpx.routes[0].points;
+	   name = gpx.routes[0].name;
+
+	}
+        else if (gpx.waypoints.length > 0) { // See if it is a waypoint
+           pointsArr= gpx.waypoints;
+           name = pointsArr[0].name;
+	}
+	else
+	{
+		alert("No tracks or routes")
+		exit 
+	}
+	date = pointsArr[pointsArr.length - 1].time
+//	let fileName = document.getElementById("upload").value;
+// Main part of code
+
+	let shortTrack = simplify(pointsArr, XTRACK ); // 10 Meters
+	var  xmltext = getCoordinates(shortTrack, name, date, "")
+
+// TEST CODE - code to download the file back as a gpx for testing purposes.
+	var filename = name+'.gpx';
+	var pom = document.createElement('a');
+	var bb = new Blob([xmltext], {type: 'text/plain'});
+
+	pom.setAttribute('href', window.URL.createObjectURL(bb));
+	pom.setAttribute('download', filename);
+
+	pom.dataset.downloadurl = ['text/plain', pom.download, pom.href].join(':');
+	pom.draggable = true;
+	pom.classList.add('dragout');
+
+// END TEST
+
+pom.click();
+    }	
+
+    reader.readAsText(files[0]);
+
+
+}
+
+</script>
+</body></html>
